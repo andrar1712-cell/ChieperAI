@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { ChatSession, Settings, ActiveTab } from '../types';
 import { storage } from '../utils/storage';
+import logoImg from '../assets/images/chieperai_logo_1783699616048.jpg';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -140,6 +141,12 @@ export default function Sidebar({
           {/* Logo Brand Header */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-black/5 dark:border-white/5">
             <div className="flex items-center gap-2 select-none">
+              <img 
+                src={logoImg} 
+                alt="CHIEPERAI Logo" 
+                className="w-6 h-6 rounded-lg object-cover shadow-sm border border-black/5 dark:border-white/10"
+                referrerPolicy="no-referrer"
+              />
               <span className="text-xl font-black tracking-widest bg-gradient-to-r from-[#4F8CFF] via-[#7C5CFF] to-[#00D4FF] bg-clip-text text-transparent">
                 CHIEPERAI
               </span>

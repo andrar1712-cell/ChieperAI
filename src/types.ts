@@ -45,3 +45,4 @@ export interface TokenUsage {
 }
 
 export type ActiveTab = 'chat' | 'prompts' | 'about' | 'contact' | 'settings';
+

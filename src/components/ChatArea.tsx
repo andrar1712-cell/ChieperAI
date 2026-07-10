@@ -6,6 +6,7 @@ import {
   Printer, Share2, Clipboard, MessageSquareHeart
 } from 'lucide-react';
 import { ChatSession, Message, Settings } from '../types';
+import logoImg from '../assets/images/chieperai_logo_1783699616048.jpg';
 
 interface ChatAreaProps {
   session: ChatSession | null;
@@ -393,9 +394,14 @@ export default function ChatArea({
         ) : (
           /* Empty Chat Area / Dashboard State */
           <div className="h-full flex flex-col justify-center items-center py-12 max-w-2xl mx-auto text-center px-4">
-            <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#4F8CFF] via-[#7C5CFF] to-[#00D4FF] p-0.5 shadow-xl animate-float pointer-events-none mb-6">
-              <div className="w-full h-full rounded-[22px] dark:bg-[#090909] bg-white flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-[#4F8CFF]" />
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-[#4F8CFF] via-[#7C5CFF] to-[#00D4FF] p-0.5 shadow-xl animate-float pointer-events-none mb-6">
+              <div className="w-full h-full rounded-[22px] dark:bg-[#090909] bg-white flex items-center justify-center overflow-hidden">
+                <img 
+                  src={logoImg} 
+                  alt="CHIEPERAI Logo" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
               </div>
             </div>
 
