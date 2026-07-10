@@ -1,0 +1,6 @@
+{
+  "name": "CHIEPERAI",
+  "description": "Premium Liquid Glass AI Chat Assistant powered by Gemini AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
