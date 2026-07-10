@@ -9,6 +9,6 @@ dotenv.config();
 export const CONFIG = {
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   appUrl: process.env.APP_URL || 'http://localhost:3000',
-  defaultModel: 'gemini-3.5-flash',
+  defaultModel: 'gemini-2.5-flash',
   userAgent: 'aistudio-build'
 };
