@@ -315,6 +315,11 @@ export default function App() {
         signal: controller.signal
       });
 
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || `Server returned status ${response.status}`);
+      }
+
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       if (!reader) {
@@ -322,15 +327,20 @@ export default function App() {
       }
 
       let accumulatedText = '';
+      let buffer = '';
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        // Save the last incomplete line back to the buffer
+        buffer = lines.pop() || '';
+
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const rawData = line.slice(6).trim();
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data: ')) {
+            const rawData = trimmed.slice(6).trim();
             if (rawData === '[DONE]') {
               break;
             }
@@ -343,16 +353,21 @@ export default function App() {
               if (parsed.text) {
                 accumulatedText += parsed.text;
 
-                // Update text state dynamically
-                const refreshedSessions = [...updatedSessions];
-                const sessionToUpdate = refreshedSessions.find(s => s.id === currentSessionId);
-                if (sessionToUpdate) {
-                  const msgIndex = sessionToUpdate.messages.findIndex(m => m.id === assistantMsgId);
-                  if (msgIndex !== -1) {
-                    sessionToUpdate.messages[msgIndex].content = accumulatedText;
-                    setSessions(refreshedSessions);
-                  }
-                }
+                // Update text state dynamically with a functional state update to trigger proper re-renders
+                setSessions(prevSessions => {
+                  return prevSessions.map(s => {
+                    if (s.id === currentSessionId) {
+                      const updatedMessages = s.messages.map(m => {
+                        if (m.id === assistantMsgId) {
+                          return { ...m, content: accumulatedText };
+                        }
+                        return m;
+                      });
+                      return { ...s, messages: updatedMessages };
+                    }
+                    return s;
+                  });
+                });
               }
             } catch {
               // ignore partial line parsing issues
@@ -362,20 +377,26 @@ export default function App() {
       }
 
       // Finish streaming, compute tokens, and store
-      const refreshedSessions = [...updatedSessions];
-      const sessionToUpdate = refreshedSessions.find(s => s.id === currentSessionId);
-      if (sessionToUpdate) {
-        const msgIndex = sessionToUpdate.messages.findIndex(m => m.id === assistantMsgId);
-        if (msgIndex !== -1) {
-          sessionToUpdate.messages[msgIndex].content = accumulatedText;
-          const estimatedTokens = Math.ceil(accumulatedText.length / 3.5) + Math.ceil(text.length / 3.5);
-          sessionToUpdate.messages[msgIndex].tokens = estimatedTokens;
-          storage.addTokenUsage(estimatedTokens, 1);
-          
-          setSessions(refreshedSessions);
-          storage.saveSessions(refreshedSessions);
-        }
-      }
+      setSessions(prevSessions => {
+        const finalSessions = prevSessions.map(s => {
+          if (s.id === currentSessionId) {
+            const updatedMessages = s.messages.map(m => {
+              if (m.id === assistantMsgId) {
+                const estimatedTokens = Math.ceil(accumulatedText.length / 3.5) + Math.ceil(text.length / 3.5);
+                storage.addTokenUsage(estimatedTokens, 1);
+                return { ...m, content: accumulatedText, tokens: estimatedTokens };
+              }
+              return m;
+            });
+            return { ...s, messages: updatedMessages };
+          }
+          return s;
+        });
+        
+        // Save to local storage after calculating
+        storage.saveSessions(finalSessions);
+        return finalSessions;
+      });
 
     } catch (error: any) {
       if (error.name === 'AbortError') {
