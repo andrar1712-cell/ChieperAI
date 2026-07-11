@@ -3,16 +3,16 @@ import Markdown from 'react-markdown';
 import { 
   Send, Copy, Check, Sparkles, Pin, Star, Trash2, Edit2, 
   ArrowDown, Loader2, Play, Square, RefreshCw, FileText, Download, 
-  Printer, Share2, Clipboard, MessageSquareHeart
+  Printer, Share2, Clipboard, MessageSquareHeart, Paperclip, X, Image, Eye
 } from 'lucide-react';
-import { ChatSession, Message, Settings } from '../types';
+import { ChatSession, Message, Settings, AttachedFile } from '../types';
 import logoImg from '../assets/images/chieperai_logo_1783699616048.jpg';
 
 interface ChatAreaProps {
   session: ChatSession | null;
   settings: Settings;
   isGenerating: boolean;
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, files?: AttachedFile[]) => void;
   onEditMessage: (messageId: string, newContent: string) => void;
   onRegenerateResponse: () => void;
   onStopGenerating: () => void;
@@ -86,8 +86,93 @@ export default function ChatArea({
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [copiedEntire, setCopiedEntire] = useState(false);
 
+  // File Staging and Drag States
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // File loading and parsing logic
+  const processFiles = (filesList: FileList) => {
+    const filesArray = Array.from(filesList);
+    
+    filesArray.forEach(file => {
+      const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
+      const fileType = file.type;
+      const isImage = fileType.startsWith('image/');
+      const isPdf = fileType === 'application/pdf';
+      
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      const textExtensions = ['txt', 'md', 'js', 'ts', 'jsx', 'tsx', 'html', 'css', 'json', 'xml', 'csv', 'py', 'go', 'rs', 'c', 'cpp', 'java', 'sh', 'yaml', 'yml', 'ini', 'conf'];
+      const isText = fileType.startsWith('text/') || (ext && textExtensions.includes(ext));
+
+      const newAttachedFile: AttachedFile = {
+        id,
+        name: file.name,
+        type: fileType || 'application/octet-stream',
+        size: file.size
+      };
+
+      if (isImage || isPdf) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            newAttachedFile.base64 = e.target.result as string;
+            setAttachedFiles(prev => [...prev, newAttachedFile]);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else if (isText) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            newAttachedFile.content = e.target.result as string;
+            setAttachedFiles(prev => [...prev, newAttachedFile]);
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            newAttachedFile.base64 = e.target.result as string;
+            setAttachedFiles(prev => [...prev, newAttachedFile]);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(e.target.files);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
+    }
+  };
+
+  const handleRemoveFile = (id: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== id));
+  };
 
   // Quick Suggestion Prompts
   const suggestions = [
@@ -115,9 +200,10 @@ export default function ChatArea({
   };
 
   const handleSend = () => {
-    if (!input.trim() || isGenerating) return;
-    onSendMessage(input.trim());
+    if ((!input.trim() && attachedFiles.length === 0) || isGenerating) return;
+    onSendMessage(input.trim(), attachedFiles);
     setInput('');
+    setAttachedFiles([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -180,7 +266,32 @@ export default function ChatArea({
   };
 
   return (
-    <div className="flex flex-col h-full flex-1 relative overflow-hidden bg-transparent select-text">
+    <div 
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`flex flex-col h-full flex-1 relative overflow-hidden bg-transparent select-text transition-all ${
+        isDragging ? 'bg-[#4F8CFF]/5 dark:bg-[#4F8CFF]/5 outline-2 outline-dashed outline-[#4F8CFF] outline-offset-[-4px]' : ''
+      }`}
+    >
+      {/* Drag & Drop Overlay Indicator */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-white/80 dark:bg-[#090909]/80 backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none transition-all">
+          <div className="p-6 rounded-3xl bg-white dark:bg-[#0c0c0c] border border-dashed border-[#4F8CFF] shadow-2xl flex flex-col items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#4F8CFF]/10 flex items-center justify-center text-[#4F8CFF]">
+              <Download className="w-7 h-7 animate-bounce" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 text-center">
+                Lepaskan File di Sini
+              </h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-1">
+                Kirim dokumen, kode, atau gambar secara langsung ke CHIEPERAI
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Top Controls Bar */}
       {session && (
         <div className="h-14 shrink-0 flex items-center justify-between pl-14 pr-6 lg:px-6 border-b border-black/5 dark:border-white/5 backdrop-blur-md relative z-10 bg-white/40 dark:bg-black/40">
@@ -348,6 +459,62 @@ export default function ChatArea({
                           </Markdown>
                         </div>
                       )}
+
+                      {msg.files && msg.files.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-black/5 dark:border-white/10 flex flex-wrap gap-2">
+                          {msg.files.map((file) => {
+                            const isImage = file.type.startsWith('image/');
+                            return (
+                              <div 
+                                key={file.id} 
+                                className={`flex items-center gap-2 p-2 rounded-xl text-xs max-w-[240px] border ${
+                                  msg.role === 'user' 
+                                    ? 'bg-white/10 border-white/10 text-white hover:bg-white/15' 
+                                    : 'bg-black/5 border-black/5 dark:bg-white/5 dark:border-white/5 text-gray-800 dark:text-gray-200 hover:bg-black/10 dark:hover:bg-white/10'
+                                } transition-all`}
+                              >
+                                {isImage && file.base64 ? (
+                                  <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/15 flex-shrink-0">
+                                    <img 
+                                      src={file.base64} 
+                                      alt={file.name} 
+                                      className="w-full h-full object-cover" 
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/20 text-white flex-shrink-0">
+                                    <FileText className="w-4 h-4" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-bold truncate">{file.name}</div>
+                                  <div className="text-[10px] opacity-75">
+                                    {(file.size / 1024).toFixed(1)} KB
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    if (file.base64) {
+                                      link.href = file.base64;
+                                    } else if (file.content) {
+                                      const blob = new Blob([file.content], { type: file.type });
+                                      link.href = URL.createObjectURL(blob);
+                                    }
+                                    link.download = file.name;
+                                    link.click();
+                                  }}
+                                  className="p-1 rounded-md hover:bg-black/15 dark:hover:bg-white/15 transition-all flex-shrink-0"
+                                  title="Unduh File"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     {/* Double-click hint or hover controls */}
@@ -469,20 +636,83 @@ export default function ChatArea({
             </div>
           )}
 
+          {/* File Staging Area */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 p-2 bg-black/5 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-2xl max-h-[160px] overflow-y-auto scrollbar-thin">
+              {attachedFiles.map((file) => {
+                const isImage = file.type.startsWith('image/');
+                return (
+                  <div
+                    key={file.id}
+                    className="flex items-center gap-2 pl-2 pr-1 py-1 bg-white dark:bg-[#151515] border border-black/5 dark:border-white/5 rounded-xl text-xs shadow-sm hover:border-black/10 dark:hover:border-white/10 transition-all"
+                  >
+                    {isImage && file.base64 ? (
+                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/15 flex-shrink-0">
+                        <img
+                          src={file.base64}
+                          alt={file.name}
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/10 dark:bg-white/10 text-gray-500 dark:text-gray-400 flex-shrink-0">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                    )}
+                    <div className="max-w-[120px] min-w-[60px]">
+                      <div className="font-semibold truncate text-gray-700 dark:text-gray-300">
+                        {file.name}
+                      </div>
+                      <div className="text-[10px] text-gray-400 dark:text-gray-500">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFile(file.id)}
+                      className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-gray-400 hover:text-red-500 transition-all flex-shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Core Input box */}
           <div className="relative flex items-center">
+            {/* Hidden input for files */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              multiple
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isGenerating}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 p-2 rounded-xl text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all disabled:opacity-40"
+              title="Unggah File / Dokumen / Gambar"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isGenerating}
               placeholder={isGenerating ? 'Mohon tunggu...' : 'Ketik pesan Anda di sini... (Shift+Enter untuk baris baru)'}
-              className="w-full bg-black/5 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 rounded-2xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:border-[#4F8CFF]/30 transition-all font-medium resize-none min-h-[50px] max-h-[160px] text-gray-800 dark:text-gray-100 disabled:opacity-50"
+              className="w-full bg-black/5 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 rounded-2xl pl-12 pr-12 py-3.5 text-sm focus:outline-none focus:border-[#4F8CFF]/30 transition-all font-medium resize-none min-h-[50px] max-h-[160px] text-gray-800 dark:text-gray-100 disabled:opacity-50"
               rows={1}
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isGenerating}
+              disabled={(!input.trim() && attachedFiles.length === 0) || isGenerating}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 p-2.5 rounded-xl bg-gradient-to-r from-[#4F8CFF] to-[#7C5CFF] text-white shadow-lg shadow-[#4F8CFF]/15 hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:scale-100"
             >
               <Send className="w-4 h-4" />

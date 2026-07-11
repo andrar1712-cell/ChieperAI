@@ -56,11 +56,35 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
   }
 
   try {
-    // Convert client-side message format to Gemini content format
-    const contents = messages.map((m: any) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }]
-    }));
+    // Convert client-side message format to Gemini content format, including any file attachments
+    const contents = messages.map((m: any) => {
+      const parts: any[] = [{ text: m.content || '' }];
+      
+      if (m.files && Array.isArray(m.files)) {
+        m.files.forEach((f: any) => {
+          if (f.base64 && (f.type.startsWith('image/') || f.type === 'application/pdf')) {
+            // Strip data URL scheme prefix if present
+            const base64Data = f.base64.includes(',') ? f.base64.split(',')[1] : f.base64;
+            parts.push({
+              inlineData: {
+                mimeType: f.type,
+                data: base64Data
+              }
+            });
+          } else if (f.content) {
+            // For text/source code files, format and append as text part
+            parts.push({
+              text: `\n\n--- FILE ATTACHMENT: ${f.name} ---\n${f.content}\n--- END OF FILE ---`
+            });
+          }
+        });
+      }
+
+      return {
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: parts
+      };
+    });
 
     // Call generateContentStream from the modern SDK
     const responseStream = await ai.models.generateContentStream({

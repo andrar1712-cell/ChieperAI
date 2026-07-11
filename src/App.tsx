@@ -3,7 +3,7 @@ import {
   Sparkles, Sliders, Info, BookOpen, MessageCircle, Moon, Sun, 
   Menu, ChevronLeft, ChevronRight, Check, RotateCcw, AlertTriangle, Undo
 } from 'lucide-react';
-import { ChatSession, Settings, ActiveTab, Message, ThemeType } from './types';
+import { ChatSession, Settings, ActiveTab, Message, ThemeType, AttachedFile } from './types';
 import { storage, DEFAULT_SETTINGS } from './utils/storage';
 import RunningTicker from './components/RunningTicker';
 import Sidebar from './components/Sidebar';
@@ -242,7 +242,7 @@ export default function App() {
   };
 
   // SEND MESSAGE handler with dynamic streaming reader
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, files?: AttachedFile[]) => {
     let currentSessionId = activeSessionId;
     let updatedSessions = [...sessions];
 
@@ -267,7 +267,8 @@ export default function App() {
       id: Date.now().toString() + '-user',
       role: 'user',
       content: text,
-      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      files: files || []
     };
 
     const activeSessionIndex = updatedSessions.findIndex(s => s.id === currentSessionId);

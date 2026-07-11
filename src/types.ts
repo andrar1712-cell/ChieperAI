@@ -12,6 +12,15 @@ export interface Settings {
   animationSpeed: number; // seconds or factor (e.g., 0.2, 0.3, 0.5)
 }
 
+export interface AttachedFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  base64?: string;
+  content?: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -19,6 +28,7 @@ export interface Message {
   timestamp: string;
   favorite?: boolean;
   tokens?: number;
+  files?: AttachedFile[];
 }
 
 export interface ChatSession {
