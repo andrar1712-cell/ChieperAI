@@ -7,6 +7,7 @@ import { AuthUser } from '../types';
 
 interface DeveloperConsoleProps {
   currentUser: AuthUser;
+  onBackToChat?: () => void;
 }
 
 interface AdminStats {
@@ -19,7 +20,7 @@ interface AdminStats {
   apiRequestCount: number;
 }
 
-export default function DeveloperConsole({ currentUser }: DeveloperConsoleProps) {
+export default function DeveloperConsole({ currentUser, onBackToChat }: DeveloperConsoleProps) {
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
@@ -253,6 +254,16 @@ export default function DeveloperConsole({ currentUser }: DeveloperConsoleProps)
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {onBackToChat && (
+            <button
+              onClick={onBackToChat}
+              className="px-3.5 py-2 rounded-xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-xs font-bold flex items-center gap-2 transition-all active:scale-95 text-red-400"
+              title="Kembali ke Obrolan Utama"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Kembali ke Chat</span>
+            </button>
+          )}
           <button
             onClick={() => setRefreshTrigger(prev => prev + 1)}
             disabled={loading}

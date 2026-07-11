@@ -210,11 +210,13 @@ export default function App() {
     storage.saveSessions(updated);
     setActiveSessionId(newSession.id);
     storage.setActiveSessionId(newSession.id);
+    setActiveTab('chat');
   };
 
   const handleSelectSession = (id: string) => {
     setActiveSessionId(id);
     storage.setActiveSessionId(id);
+    setActiveTab('chat');
   };
 
   const handleRenameSession = (id: string, newTitle: string) => {
@@ -625,7 +627,7 @@ export default function App() {
 
         {/* 3. Core Chat Area OR Developer Dashboard */}
         {activeTab === 'admin' && currentUser?.role === 'developer' ? (
-          <DeveloperConsole currentUser={currentUser} />
+          <DeveloperConsole currentUser={currentUser} onBackToChat={() => setActiveTab('chat')} />
         ) : (
           <ChatArea
             session={activeSession}
