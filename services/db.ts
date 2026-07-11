@@ -159,7 +159,7 @@ export const dbService = {
   },
 
   // Verify login credentials
-  loginUser(email: string, password?: string, isGoogle: boolean = false): { success: boolean; user?: DbUser; message: string } {
+  loginUser(email: string, password?: string, isGoogle: boolean = false, name?: string): { success: boolean; user?: DbUser; message: string } {
     const data = readDb();
     const normalizedEmail = email.toLowerCase().trim();
     const userIndex = data.users.findIndex((u: DbUser) => u.email.toLowerCase() === normalizedEmail);
@@ -167,8 +167,8 @@ export const dbService = {
     if (userIndex === -1) {
       if (isGoogle) {
         // Auto-register google users
-        const name = email.split('@')[0];
-        const regResult = this.registerUser(name, email);
+        const defaultName = name || email.split('@')[0];
+        const regResult = this.registerUser(defaultName, email);
         if (regResult.success && regResult.user) {
           // Update active status
           const updatedData = readDb();
@@ -195,6 +195,8 @@ export const dbService = {
       if (!user.password || user.password !== password) {
         return { success: false, message: 'Password salah!' };
       }
+    } else if (name && user.name !== name) {
+      user.name = name;
     }
 
     // Set online status and update active timestamp

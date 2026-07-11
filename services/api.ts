@@ -161,12 +161,12 @@ router.post('/auth/register', (req: Request, res: Response) => {
 });
 
 router.post('/auth/login', (req: Request, res: Response) => {
-  const { email, password, isGoogle } = req.body;
+  const { email, password, isGoogle, name } = req.body;
   if (!email) {
     res.status(400).json({ success: false, message: 'Email harus diisi!' });
     return;
   }
-  const result = dbService.loginUser(email, password, isGoogle);
+  const result = dbService.loginUser(email, password, isGoogle, name);
   res.json(result);
 });
 

@@ -4,6 +4,8 @@ import {
   Mail, Lock, User, Sparkles, AlertCircle, Eye, EyeOff, CheckCircle2, ArrowRight, Chrome
 } from 'lucide-react';
 import { AuthUser } from '../types';
+import { auth, googleProvider } from '../lib/firebase';
+import { signInWithPopup } from 'firebase/auth';
 
 interface AuthScreenProps {
   onLoginSuccess: (user: AuthUser) => void;
@@ -21,25 +23,6 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Listen to Google OAuth popup callback messages
-  React.useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
-        return;
-      }
-      
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const token = event.data.accessToken;
-        if (token) {
-          await handleActualGoogleLogin(token);
-        }
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,15 +90,26 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     }
   };
 
-  const handleActualGoogleLogin = async (token: string) => {
+  const handleGoogleClick = async () => {
     setError(null);
     setLoading(true);
-
     try {
-      const response = await fetch('/api/auth/google-login', {
+      const result = await signInWithPopup(auth, googleProvider);
+      const googleUser = result.user;
+      if (!googleUser.email) {
+        setError('Email tidak dikembalikan oleh Google.');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: token })
+        body: JSON.stringify({
+          email: googleUser.email,
+          isGoogle: true,
+          name: googleUser.displayName || undefined
+        })
       });
 
       const data = await response.json();
@@ -130,33 +124,14 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       setTimeout(() => {
         onLoginSuccess(data.user);
       }, 800);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('Koneksi Google gagal. Coba lagi.');
+      if (err.code === 'auth/popup-blocked') {
+        setError('Popup diblokir! Silakan izinkan popup untuk situs ini.');
+      } else {
+        setError(err.message || 'Koneksi Google gagal. Coba lagi.');
+      }
       setLoading(false);
-    }
-  };
-
-  const handleGoogleClick = () => {
-    setError(null);
-    const clientId = '1002695452383-e5oi3dlgfk68voddfm03a3te0p581d0r.apps.googleusercontent.com';
-    const redirectUri = `${window.location.origin}/auth/callback`;
-    const scopes = 'openid email profile';
-    const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scopes)}`;
-
-    const width = 500;
-    const height = 650;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-
-    const popup = window.open(
-      googleUrl,
-      'google_oauth_popup',
-      `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
-    );
-
-    if (!popup) {
-      setError('Popup diblokir! Silakan izinkan popup untuk situs ini.');
     }
   };
 
