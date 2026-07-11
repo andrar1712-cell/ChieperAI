@@ -19,6 +19,12 @@ async function startServer() {
     res.json({ status: 'ok', app: 'CHIEPERAI', timestamp: new Date() });
   });
 
+  // Explicit route for Google Search Console Verification
+  app.get('/google15ac6785dcdf054c.html', (req, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.send('google-site-verification: google15ac6785dcdf054c.html');
+  });
+
   // Mount Gemini API Router
   app.use('/api', apiRouter);
 
