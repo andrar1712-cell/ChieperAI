@@ -96,8 +96,24 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const googleUser = result.user;
-      if (!googleUser.email) {
-        setError('Email tidak dikembalikan oleh Google.');
+      
+      // Resilient email and name extraction from top-level or providerData array
+      let email = googleUser.email;
+      let displayName = googleUser.displayName;
+      
+      if (!email && googleUser.providerData && googleUser.providerData.length > 0) {
+        const googleProviderInfo = googleUser.providerData.find(
+          (p) => p.providerId === 'google.com' || p.email
+        );
+        if (googleProviderInfo) {
+          email = googleProviderInfo.email;
+          displayName = displayName || googleProviderInfo.displayName;
+        }
+      }
+
+      if (!email) {
+        const providersStr = googleUser.providerData?.map(p => `${p.providerId}:${p.email}`).join(', ') || 'none';
+        setError(`Email tidak dikembalikan oleh Google. (UID: ${googleUser.uid}, Providers: ${providersStr})`);
         setLoading(false);
         return;
       }
@@ -106,9 +122,9 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: googleUser.email,
+          email: email.trim(),
           isGoogle: true,
-          name: googleUser.displayName || undefined
+          name: displayName || undefined
         })
       });
 
