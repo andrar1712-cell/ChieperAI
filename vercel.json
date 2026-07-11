@@ -15,27 +15,6 @@
   ],
   "routes": [
     {
-      "src": "/sitemap.xml",
-      "dest": "/sitemap.xml",
-      "headers": {
-        "Content-Type": "application/xml"
-      }
-    },
-    {
-      "src": "/robots.txt",
-      "dest": "/robots.txt",
-      "headers": {
-        "Content-Type": "text/plain"
-      }
-    },
-    {
-      "src": "/google15ac6785dcdf054c.html",
-      "dest": "/google15ac6785dcdf054c.html",
-      "headers": {
-        "Content-Type": "text/html"
-      }
-    },
-    {
       "handle": "filesystem"
     },
     {
