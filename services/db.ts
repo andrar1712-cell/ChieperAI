@@ -26,84 +26,145 @@ export interface SystemStats {
   apiRequestCount: number;
 }
 
-const DB_DIR = path.join(process.cwd(), 'data');
-const DB_FILE = path.join(DB_DIR, 'db.json');
+const isVercel = process.env.VERCEL === '1';
+const BUNDLED_DB_DIR = path.join(process.cwd(), 'data');
+const BUNDLED_DB_FILE = path.join(BUNDLED_DB_DIR, 'db.json');
+
+const DB_DIR = isVercel ? '/tmp' : BUNDLED_DB_DIR;
+const DB_FILE = isVercel ? '/tmp/db.json' : BUNDLED_DB_FILE;
+
+// In-memory cache & fallback in case of filesystem issues or when scaling horizontally
+let memoryDbCache: any = null;
 
 // Ensure database directory and file exist
 function initializeDb() {
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
-  }
-
-  const defaultDeveloper: DbUser = {
-    id: 'dev-andra-1712',
-    name: 'Andra Developer',
-    email: 'andrar1712@gmail.com',
-    password: 'Andra1712@', // Secure but simple for direct matching
-    role: 'developer',
-    registeredAt: new Date().toISOString(),
-    lastActiveAt: new Date().toISOString(),
-    isOnline: false,
-    status: 'active',
-    tokenUsage: 0,
-    messageCount: 0,
-    sessionCount: 0,
-  };
-
-  if (!fs.existsSync(DB_FILE)) {
-    const initialData = {
-      users: [defaultDeveloper],
-      stats: {
-        totalMessages: 0,
-        totalTokens: 0,
-        avgResponseTimeMs: 120,
-        apiRequestCount: 0,
-      }
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
-  } else {
-    // Read and verify developer account exists
-    try {
-      const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
-      const devExists = data.users?.some((u: DbUser) => u.email === 'andrar1712@gmail.com');
-      if (!devExists) {
-        data.users = data.users || [];
-        data.users.push(defaultDeveloper);
-        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-      }
-    } catch (e) {
-      // Re-create if corrupted
-      const initialData = {
-        users: [defaultDeveloper],
-        stats: {
-          totalMessages: 0,
-          totalTokens: 0,
-          avgResponseTimeMs: 120,
-          apiRequestCount: 0,
-        }
-      };
-      fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
+  try {
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
     }
+
+    const defaultDeveloper: DbUser = {
+      id: 'dev-andra-1712',
+      name: 'Andra Developer',
+      email: 'andrar1712@gmail.com',
+      password: 'Andra1712@', // Secure but simple for direct matching
+      role: 'developer',
+      registeredAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      isOnline: false,
+      status: 'active',
+      tokenUsage: 0,
+      messageCount: 0,
+      sessionCount: 0,
+    };
+
+    if (!fs.existsSync(DB_FILE)) {
+      let initialData = null;
+      
+      // Try to seed from bundled DB if on Vercel
+      if (isVercel && fs.existsSync(BUNDLED_DB_FILE)) {
+        try {
+          initialData = JSON.parse(fs.readFileSync(BUNDLED_DB_FILE, 'utf-8'));
+        } catch (e) {
+          console.error('Error loading bundled DB file:', e);
+        }
+      }
+
+      if (!initialData) {
+        initialData = {
+          users: [defaultDeveloper],
+          stats: {
+            totalMessages: 0,
+            totalTokens: 0,
+            avgResponseTimeMs: 120,
+            apiRequestCount: 0,
+          }
+        };
+      } else {
+        const devExists = initialData.users?.some((u: DbUser) => u.email === 'andrar1712@gmail.com');
+        if (!devExists) {
+          initialData.users = initialData.users || [];
+          initialData.users.push(defaultDeveloper);
+        }
+      }
+
+      fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
+      memoryDbCache = initialData;
+    } else {
+      // Read and verify developer account exists
+      try {
+        const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+        const devExists = data.users?.some((u: DbUser) => u.email === 'andrar1712@gmail.com');
+        if (!devExists) {
+          data.users = data.users || [];
+          data.users.push(defaultDeveloper);
+          fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+        }
+        memoryDbCache = data;
+      } catch (e) {
+        // Re-create if corrupted
+        const initialData = {
+          users: [defaultDeveloper],
+          stats: {
+            totalMessages: 0,
+            totalTokens: 0,
+            avgResponseTimeMs: 120,
+            apiRequestCount: 0,
+          }
+        };
+        fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
+        memoryDbCache = initialData;
+      }
+    }
+  } catch (err) {
+    console.error('Database initialization caught non-blocking error:', err);
   }
 }
 
 // Load DB helper
 function readDb() {
   initializeDb();
+  if (memoryDbCache) {
+    return memoryDbCache;
+  }
   try {
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+    const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+    memoryDbCache = data;
+    return data;
   } catch (error) {
-    console.error('Error reading database file:', error);
-    return { users: [], stats: { totalMessages: 0, totalTokens: 0, avgResponseTimeMs: 120, apiRequestCount: 0 } };
+    console.error('Error reading database file, using memory fallback:', error);
+    if (!memoryDbCache) {
+      memoryDbCache = {
+        users: [
+          {
+            id: 'dev-andra-1712',
+            name: 'Andra Developer',
+            email: 'andrar1712@gmail.com',
+            password: 'Andra1712@',
+            role: 'developer',
+            registeredAt: new Date().toISOString(),
+            lastActiveAt: new Date().toISOString(),
+            isOnline: false,
+            status: 'active',
+            tokenUsage: 0,
+            messageCount: 0,
+            sessionCount: 0,
+          }
+        ],
+        stats: { totalMessages: 0, totalTokens: 0, avgResponseTimeMs: 120, apiRequestCount: 0 }
+      };
+    }
+    return memoryDbCache;
   }
 }
 
 // Save DB helper
 function writeDb(data: any) {
+  memoryDbCache = data;
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (error) {
-    console.error('Error writing database file:', error);
+    console.error('Error writing database file, proceeding in memory:', error);
   }
 }
 

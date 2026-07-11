@@ -201,21 +201,7 @@ router.post('/auth/google-login', async (req: Request, res: Response) => {
     }
 
     // Authenticate/register user in our local DB
-    const loginResult = dbService.loginUser(email, undefined, true);
-    
-    // Ensure name is updated if registering a new user
-    if (loginResult.success && loginResult.user) {
-      const user = loginResult.user;
-      if (user.name === email.split('@')[0] && name) {
-        const data = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'data', 'db.json'), 'utf-8'));
-        const userIdx = data.users.findIndex((u: any) => u.id === user.id);
-        if (userIdx !== -1) {
-          data.users[userIdx].name = name;
-          user.name = name;
-          fs.writeFileSync(path.join(process.cwd(), 'data', 'db.json'), JSON.stringify(data, null, 2), 'utf-8');
-        }
-      }
-    }
+    const loginResult = dbService.loginUser(email, undefined, true, name);
 
     res.json(loginResult);
   } catch (err: any) {
