@@ -128,6 +128,8 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       console.error(err);
       if (err.code === 'auth/popup-blocked') {
         setError('Popup diblokir! Silakan izinkan popup untuk situs ini.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError(`Firebase Error: Domain "${window.location.hostname}" belum diotorisasi. Jika Anda adalah pemilik website ini, silakan ganti konfigurasi Firebase di file 'firebase-applet-config.json' dengan Firebase Project Anda sendiri, lalu tambahkan domain ini ke daftar 'Authorized Domains' di Firebase Console.`);
       } else {
         setError(err.message || 'Koneksi Google gagal. Coba lagi.');
       }
@@ -361,7 +363,6 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
             <Chrome className="w-4 h-4 text-red-400" />
             <span>Masuk dengan Google</span>
           </button>
-
 
         </motion.div>
       </div>

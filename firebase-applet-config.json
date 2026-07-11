@@ -1,10 +1,9 @@
 {
-  "projectId": "invertible-earth-47c1c",
-  "appId": "1:1002695452383:web:45381481b8dd876627ab6a",
-  "apiKey": "AIzaSyAMkYB6gE5y24msmofKdUi7RRJCwdQpUL0",
-  "authDomain": "invertible-earth-47c1c.firebaseapp.com",
-  "storageBucket": "invertible-earth-47c1c.firebasestorage.app",
-  "messagingSenderId": "1002695452383",
-  "measurementId": "",
-  "oAuthClientId": "1002695452383-e5oi3dlgfk68voddfm03a3te0p581d0r.apps.googleusercontent.com"
+  "apiKey": "AIzaSyBXdjsTcQnboj8ZPrl7StGTAX7gEaehBkw",
+  "authDomain": "chieperai.firebaseapp.com",
+  "projectId": "chieperai",
+  "storageBucket": "chieperai.firebasestorage.app",
+  "messagingSenderId": "439121822437",
+  "appId": "1:439121822437:web:c4c48c7a029f8104faca0c",
+  "measurementId": "G-KYX83LWXTC"
 }
