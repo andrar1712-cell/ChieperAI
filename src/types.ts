@@ -54,5 +54,20 @@ export interface TokenUsage {
   totalMessages: number;
 }
 
-export type ActiveTab = 'chat' | 'prompts' | 'about' | 'contact' | 'settings';
+export type ActiveTab = 'chat' | 'prompts' | 'about' | 'contact' | 'settings' | 'admin';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'user' | 'developer';
+  registeredAt: string;
+  lastActiveAt: string;
+  isOnline: boolean;
+  status: 'active' | 'suspended';
+  tokenUsage?: number;
+  messageCount?: number;
+  sessionCount?: number;
+}
+
 

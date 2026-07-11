@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Plus, Search, MessageSquare, Pin, Star, Trash2, Edit3, X, 
-  Menu, Sparkles, BookOpen, Sliders, Info, MessageCircle, RefreshCw, PinOff
+  Menu, Sparkles, BookOpen, Sliders, Info, MessageCircle, RefreshCw, PinOff,
+  LogOut, Database, User
 } from 'lucide-react';
-import { ChatSession, Settings, ActiveTab } from '../types';
+import { ChatSession, Settings, ActiveTab, AuthUser } from '../types';
 import { storage } from '../utils/storage';
 import logoImg from '../assets/images/chieperai_logo_1783699616048.jpg';
 
@@ -21,6 +22,10 @@ interface SidebarProps {
   onOpenTab: (tab: ActiveTab) => void;
   isOpen: boolean;
   onToggleOpen: (open: boolean) => void;
+  currentUser: AuthUser | null;
+  activeTab: ActiveTab;
+  onSetActiveTab: (tab: ActiveTab) => void;
+  onLogout: () => void;
 }
 
 export default function Sidebar({
@@ -37,6 +42,10 @@ export default function Sidebar({
   onOpenTab,
   isOpen,
   onToggleOpen,
+  currentUser,
+  activeTab,
+  onSetActiveTab,
+  onLogout,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -369,34 +378,93 @@ export default function Sidebar({
 
           {/* Bottom Navigation Links */}
           <div className="shrink-0 p-3 border-t border-black/5 dark:border-white/5 space-y-1">
+            {currentUser?.role === 'developer' && (
+              <button
+                onClick={() => {
+                  onSetActiveTab('admin');
+                  onToggleOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left group ${
+                  activeTab === 'admin'
+                    ? 'bg-[#4F8CFF]/15 text-[#4F8CFF] font-semibold border-l-2 border-[#4F8CFF]'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
+                }`}
+              >
+                <Database className="w-4.5 h-4.5 text-yellow-400 group-hover:scale-110 transition-transform" />
+                <span>Developer Console</span>
+              </button>
+            )}
+
             <button
-              onClick={() => onOpenTab('prompts')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all text-left group"
+              onClick={() => {
+                onSetActiveTab('chat');
+                onOpenTab('prompts');
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left group ${
+                activeTab === 'prompts'
+                  ? 'bg-[#4F8CFF]/15 text-[#4F8CFF] font-semibold'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
             >
               <BookOpen className="w-4.5 h-4.5 text-[#4F8CFF] group-hover:scale-110 transition-transform" />
               Prompt Library
             </button>
             <button
-              onClick={() => onOpenTab('settings')}
+              onClick={() => {
+                onSetActiveTab('chat');
+                onOpenTab('settings');
+              }}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all text-left group"
             >
               <Sliders className="w-4.5 h-4.5 text-[#7C5CFF] group-hover:scale-110 transition-transform" />
               Pengaturan UI
             </button>
             <button
-              onClick={() => onOpenTab('contact')}
+              onClick={() => {
+                onSetActiveTab('chat');
+                onOpenTab('contact');
+              }}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all text-left group"
             >
               <MessageCircle className="w-4.5 h-4.5 text-emerald-500 group-hover:scale-110 transition-transform" />
               Contact Developer
             </button>
             <button
-              onClick={() => onOpenTab('about')}
+              onClick={() => {
+                onSetActiveTab('chat');
+                onOpenTab('about');
+              }}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all text-left group"
             >
               <Info className="w-4.5 h-4.5 text-[#00D4FF] group-hover:scale-110 transition-transform" />
               Tentang Aplikasi
             </button>
+          </div>
+
+          {/* User Account Profile Box & Logout Section */}
+          <div className="shrink-0 p-3.5 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.01]">
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#4f8cff] to-[#7c5cff] text-white flex items-center justify-center text-xs font-bold font-mono">
+                  {currentUser?.name?.slice(0, 2).toUpperCase() || 'US'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold truncate text-gray-850 dark:text-gray-100">
+                    {currentUser?.name || 'User'}
+                  </div>
+                  <div className="text-[10px] text-gray-400 truncate">
+                    {currentUser?.email || ''}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={onLogout}
+                className="p-2 rounded-xl hover:bg-red-500/10 text-gray-400 hover:text-red-500 active:scale-95 transition-all"
+                title="Keluar / Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 

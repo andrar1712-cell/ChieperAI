@@ -370,13 +370,18 @@ export default function ChatArea({
       >
         {session && session.messages.length > 0 ? (
           <div className="max-w-3xl mx-auto space-y-6">
-            {session.messages.map((msg, index) => (
-              <div 
-                key={msg.id} 
-                className={`flex flex-col group ${
-                  msg.role === 'user' ? 'items-end' : 'items-start'
-                }`}
-              >
+            {session.messages.map((msg, index) => {
+              // Hide empty assistant messages during generation to avoid empty bubbles on screen
+              if (msg.role === 'assistant' && !msg.content) {
+                return null;
+              }
+              return (
+                <div 
+                  key={msg.id} 
+                  className={`flex flex-col group ${
+                    msg.role === 'user' ? 'items-end' : 'items-start'
+                  }`}
+                >
                 {/* Bubble Outer */}
                 <div className="flex gap-3 max-w-[88%] items-start relative">
                   
@@ -535,10 +540,10 @@ export default function ChatArea({
                   <div className="w-full border-b border-black/[0.02] dark:border-white/[0.02] my-1" />
                 )}
               </div>
-            ))}
+            );})}
 
             {/* Skeleton / Thinking Animation during generation */}
-            {isGenerating && (
+            {isGenerating && (!session.messages[session.messages.length - 1] || !session.messages[session.messages.length - 1].content) && (
               <div className="flex gap-3 max-w-[88%] items-start">
                 <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center bg-gradient-to-r from-[#4F8CFF] to-[#7C5CFF] text-white shadow-md animate-spin">
                   <Loader2 className="w-4 h-4" />

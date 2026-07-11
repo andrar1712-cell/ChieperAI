@@ -3,7 +3,7 @@ import {
   Sparkles, Sliders, Info, BookOpen, MessageCircle, Moon, Sun, 
   Menu, ChevronLeft, ChevronRight, Check, RotateCcw, AlertTriangle, Undo
 } from 'lucide-react';
-import { ChatSession, Settings, ActiveTab, Message, ThemeType, AttachedFile } from './types';
+import { ChatSession, Settings, ActiveTab, Message, ThemeType, AttachedFile, AuthUser } from './types';
 import { storage, DEFAULT_SETTINGS } from './utils/storage';
 import RunningTicker from './components/RunningTicker';
 import Sidebar from './components/Sidebar';
@@ -12,8 +12,12 @@ import SettingsModal from './components/SettingsModal';
 import PromptLibraryModal from './components/PromptLibraryModal';
 import ContactModal from './components/ContactModal';
 import AboutModal from './components/AboutModal';
+import AuthScreen from './components/AuthScreen';
+import DeveloperConsole from './components/DeveloperConsole';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('chat');
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -35,6 +39,15 @@ export default function App() {
 
   // Initialize data on mount
   useEffect(() => {
+    const savedUser = localStorage.getItem('chieper_user');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem('chieper_user');
+      }
+    }
+
     const savedSettings = storage.getSettings();
     setSettings(savedSettings);
     applyTheme(savedSettings.theme);
@@ -49,6 +62,45 @@ export default function App() {
       setActiveSessionId(savedSessions[0].id);
     }
   }, []);
+
+  // Heartbeat / Liveness liveness check
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const sendHeartbeat = async () => {
+      try {
+        await fetch('/api/auth/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: currentUser.email })
+        });
+      } catch (err) {
+        console.warn('Liveness heartbeat error:', err);
+      }
+    };
+
+    sendHeartbeat(); // run immediately
+    const interval = setInterval(sendHeartbeat, 25000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  const handleLogout = async () => {
+    if (currentUser) {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: currentUser.email })
+        });
+      } catch (err) {
+        console.warn('Logout endpoint failed:', err);
+      }
+    }
+    setCurrentUser(null);
+    setActiveTab('chat');
+    localStorage.removeItem('chieper_user');
+    showToast('Anda berhasil keluar dari sistem.');
+  };
 
   // Monitor window resize to adjust sidebar
   useEffect(() => {
@@ -311,7 +363,9 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: activeSession.messages.slice(0, -1), // send context
-          temperature: 0.7
+          temperature: 0.7,
+          userEmail: currentUser?.email,
+          isNewSession: activeSession.messages.length <= 2
         }),
         signal: controller.signal
       });
@@ -499,6 +553,17 @@ export default function App() {
   // Active Session Finder
   const activeSession = sessions.find(s => s.id === activeSessionId) || null;
 
+  if (!currentUser) {
+    return (
+      <AuthScreen 
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          localStorage.setItem('chieper_user', JSON.stringify(user));
+        }} 
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden dark:bg-[#090909] bg-[#F8F9FC] text-gray-800 dark:text-gray-100 transition-colors duration-300">
       {/* 1. Premium Infinite Running Text */}
@@ -524,6 +589,10 @@ export default function App() {
             setIsSidebarOpen(open);
             storage.setSidebarOpen(open);
           }}
+          currentUser={currentUser}
+          activeTab={activeTab}
+          onSetActiveTab={setActiveTab}
+          onLogout={handleLogout}
         />
 
         {/* Outer Sidebar Toggle Grip for Desktops */}
@@ -541,20 +610,24 @@ export default function App() {
           </button>
         </div>
 
-        {/* 3. Core Chat Area */}
-        <ChatArea
-          session={activeSession}
-          settings={settings}
-          isGenerating={isGenerating}
-          onSendMessage={handleSendMessage}
-          onEditMessage={handleEditMessage}
-          onRegenerateResponse={handleRegenerateResponse}
-          onStopGenerating={handleStopGenerating}
-          onContinueGenerating={handleContinueGenerating}
-          onTogglePin={handleTogglePinActive}
-          onToggleFavorite={handleToggleFavoriteActive}
-          onSelectSuggestion={handleSendMessage}
-        />
+        {/* 3. Core Chat Area OR Developer Dashboard */}
+        {activeTab === 'admin' && currentUser?.role === 'developer' ? (
+          <DeveloperConsole currentUser={currentUser} />
+        ) : (
+          <ChatArea
+            session={activeSession}
+            settings={settings}
+            isGenerating={isGenerating}
+            onSendMessage={handleSendMessage}
+            onEditMessage={handleEditMessage}
+            onRegenerateResponse={handleRegenerateResponse}
+            onStopGenerating={handleStopGenerating}
+            onContinueGenerating={handleContinueGenerating}
+            onTogglePin={handleTogglePinActive}
+            onToggleFavorite={handleToggleFavoriteActive}
+            onSelectSuggestion={handleSendMessage}
+          />
+        )}
       </div>
 
       {/* Modals Controllers */}
