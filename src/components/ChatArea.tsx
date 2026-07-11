@@ -3,7 +3,8 @@ import Markdown from 'react-markdown';
 import { 
   Send, Copy, Check, Sparkles, Pin, Star, Trash2, Edit2, 
   ArrowDown, Loader2, Play, Square, RefreshCw, FileText, Download, 
-  Printer, Share2, Clipboard, MessageSquareHeart, Paperclip, X, Image, Eye
+  Printer, Share2, Clipboard, MessageSquareHeart, Paperclip, X, Image, Eye,
+  Mic, MicOff
 } from 'lucide-react';
 import { ChatSession, Message, Settings, AttachedFile } from '../types';
 import logoImg from '../assets/images/chieperai_logo_1783699616048.jpg';
@@ -85,6 +86,94 @@ export default function ChatArea({
   const [editContent, setEditContent] = useState('');
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [copiedEntire, setCopiedEntire] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  const copyMessageContent = (id: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedMessageId(id);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+  };
+
+  // Web Speech API / Voice Recording States
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const startSpeechRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Browser Anda tidak mendukung Web Speech API / Perekaman Suara. Harap gunakan browser Google Chrome atau Microsoft Edge.');
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.error('Error stopping recognition:', e);
+        }
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.lang = 'id-ID';
+
+      rec.onstart = () => {
+        setIsListening(true);
+      };
+
+      rec.onresult = (event: any) => {
+        let resultText = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            resultText += event.results[i][0].transcript;
+          }
+        }
+        if (resultText) {
+          setInput(prev => {
+            const trimmed = prev.trim();
+            return trimmed ? `${trimmed} ${resultText.trim()}` : resultText.trim();
+          });
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          alert('Akses mikrofon ditolak. Harap izinkan akses mikrofon di pengaturan browser Anda.');
+        }
+        setIsListening(false);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = rec;
+      rec.start();
+    } catch (err) {
+      console.error('Error starting speech recognition:', err);
+      setIsListening(false);
+    }
+  };
+
+  // Clean up speech recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+  }, []);
 
   // File Staging and Drag States
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
@@ -396,11 +485,32 @@ export default function ChatArea({
                   <div className="flex flex-col">
                     {/* Timestamp & Name */}
                     <div className={`text-[10px] font-mono text-gray-400 dark:text-gray-500 mb-1 select-none flex items-center gap-1.5 ${
-                      msg.role === 'user' ? 'justify-end' : 'justify-start'
+                      msg.role === 'user' ? 'justify-end' : 'justify-between w-full'
                     }`}>
-                      <span>{msg.role === 'user' ? 'Anda' : 'CHIEPERAI'}</span>
-                      <span>•</span>
-                      <span>{msg.timestamp}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span>{msg.role === 'user' ? 'Anda' : 'CHIEPERAI'}</span>
+                        <span>•</span>
+                        <span>{msg.timestamp}</span>
+                      </div>
+                      {msg.role === 'assistant' && (
+                        <button
+                          onClick={() => copyMessageContent(msg.id, msg.content)}
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors select-none font-sans font-medium"
+                          title="Salin Pesan"
+                        >
+                          {copiedMessageId === msg.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-500" />
+                              <span className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wider">Disalin</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clipboard className="w-3 h-3" />
+                              <span className="text-[9px] uppercase tracking-wider">Salin</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
 
                     {/* Chat Bubble Glass card */}
@@ -686,6 +796,27 @@ export default function ChatArea({
             </div>
           )}
 
+          {/* Voice Recording / Speech Indicator */}
+          {isListening && (
+            <div className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-2xl animate-pulse">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
+                <span className="text-xs font-bold text-red-500 dark:text-red-400 font-mono tracking-wide uppercase">
+                  Mendengarkan... Silakan Berbicara
+                </span>
+              </div>
+              <div className="flex gap-1 items-center">
+                <span className="w-1 h-3 bg-red-500/80 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1 h-4 bg-red-500/80 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1 h-2 bg-red-500/80 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1 h-5 bg-red-500/80 rounded-full animate-bounce" style={{ animationDelay: '450ms' }} />
+              </div>
+            </div>
+          )}
+
           {/* Core Input box */}
           <div className="relative flex items-center">
             {/* Hidden input for files */}
@@ -706,13 +837,28 @@ export default function ChatArea({
               <Paperclip className="w-4 h-4" />
             </button>
 
+            {/* Speech to text microphone button */}
+            <button
+              type="button"
+              onClick={startSpeechRecognition}
+              disabled={isGenerating}
+              className={`absolute left-12 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all disabled:opacity-40 ${
+                isListening 
+                  ? 'bg-red-500/20 border border-red-500/30 text-red-500 hover:bg-red-500/30 animate-pulse' 
+                  : 'text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
+              title={isListening ? 'Hentikan Perekaman Suara' : 'Mulai Perekaman Suara (Voice to Text)'}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isGenerating}
               placeholder={isGenerating ? 'Mohon tunggu...' : 'Ketik pesan Anda di sini... (Shift+Enter untuk baris baru)'}
-              className="w-full bg-black/5 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 rounded-2xl pl-12 pr-12 py-3.5 text-sm focus:outline-none focus:border-[#4F8CFF]/30 transition-all font-medium resize-none min-h-[50px] max-h-[160px] text-gray-800 dark:text-gray-100 disabled:opacity-50"
+              className="w-full bg-black/5 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 rounded-2xl pl-24 pr-12 py-3.5 text-sm focus:outline-none focus:border-[#4F8CFF]/30 transition-all font-medium resize-none min-h-[50px] max-h-[160px] text-gray-800 dark:text-gray-100 disabled:opacity-50"
               rows={1}
             />
             <button
