@@ -7,6 +7,7 @@ app.use(express.json());
 
 // API route mapping
 app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 // Export for Vercel serverless environment
 export default app;
