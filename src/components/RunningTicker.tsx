@@ -16,11 +16,11 @@ export default function RunningTicker() {
             key={idx} 
             className="mx-8 text-xs font-semibold uppercase tracking-widest bg-gradient-to-r from-[#4F8CFF] via-[#7C5CFF] to-[#00D4FF] bg-clip-text text-transparent flex items-center gap-2"
           >
-            ✦ ChieperAI Is Here ✦
+            ✦ CHIEPERAI IS HERE ✦
+            <span className="text-white/20 dark:text-white/10 mx-2">|</span>
+            <span>ANDRA IS ALIVEE</span>
             <span className="text-white/20 dark:text-white/10 mx-2">|</span>
             <span>Unleash The Premium Power of Gemini AI</span>
-            <span className="text-white/20 dark:text-white/10 mx-2">|</span>
-            <span>No Login Required</span>
           </span>
         ))}
       </div>

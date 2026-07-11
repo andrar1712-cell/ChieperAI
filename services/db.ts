@@ -33,6 +33,12 @@ const BUNDLED_DB_FILE = path.join(BUNDLED_DB_DIR, 'db.json');
 const DB_DIR = isVercel ? '/tmp' : BUNDLED_DB_DIR;
 const DB_FILE = isVercel ? '/tmp/db.json' : BUNDLED_DB_FILE;
 
+export const DEVELOPER_EMAILS = [
+  'andrar1712@gmail.com',
+  'andrawebdev@gmail.com',
+  'andrar1713@gmail.com'
+];
+
 // In-memory cache & fallback in case of filesystem issues or when scaling horizontally
 let memoryDbCache: any = null;
 
@@ -125,10 +131,37 @@ function initializeDb() {
 function readDb() {
   initializeDb();
   if (memoryDbCache) {
+    // Self-healing: Ensure any user in the developer list has 'developer' role
+    let modified = false;
+    if (memoryDbCache.users && Array.isArray(memoryDbCache.users)) {
+      memoryDbCache.users = memoryDbCache.users.map((u: DbUser) => {
+        if (DEVELOPER_EMAILS.includes(u.email.toLowerCase().trim()) && u.role !== 'developer') {
+          u.role = 'developer';
+          modified = true;
+        }
+        return u;
+      });
+    }
+    if (modified) {
+      writeDb(memoryDbCache);
+    }
     return memoryDbCache;
   }
   try {
     const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+    let modified = false;
+    if (data.users && Array.isArray(data.users)) {
+      data.users = data.users.map((u: DbUser) => {
+        if (DEVELOPER_EMAILS.includes(u.email.toLowerCase().trim()) && u.role !== 'developer') {
+          u.role = 'developer';
+          modified = true;
+        }
+        return u;
+      });
+    }
+    if (modified) {
+      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    }
     memoryDbCache = data;
     return data;
   } catch (error) {
@@ -186,16 +219,34 @@ export const dbService = {
   // Find user by email
   findUserByEmail(email: string): DbUser | undefined {
     const users = this.getUsers();
-    return users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const normalized = email.toLowerCase().trim();
+    const found = users.find(u => u.email.toLowerCase() === normalized);
+    if (found) return found;
+
+    // Self-healing: if it is a developer email but not found (e.g., on Vercel temporary instances),
+    // automatically register and return it!
+    if (DEVELOPER_EMAILS.includes(normalized)) {
+      const regResult = this.registerUser('Andra Developer', normalized, undefined, 'developer');
+      if (regResult.success && regResult.user) {
+        return regResult.user;
+      }
+    }
+    return undefined;
   },
 
   // Register a new user
-  registerUser(name: string, email: string, password?: string): { success: boolean; user?: DbUser; message: string } {
+  registerUser(name: string, email: string, password?: string, role?: 'user' | 'developer'): { success: boolean; user?: DbUser; message: string } {
     const data = readDb();
     const normalizedEmail = email.toLowerCase().trim();
 
-    if (data.users.some((u: DbUser) => u.email.toLowerCase() === normalizedEmail)) {
-      return { success: false, message: 'Email sudah terdaftar!' };
+    const existingUser = data.users.find((u: DbUser) => u.email.toLowerCase() === normalizedEmail);
+    if (existingUser) {
+      // If it exists but role needs upgrading to developer, do it here
+      if (DEVELOPER_EMAILS.includes(normalizedEmail) && existingUser.role !== 'developer') {
+        existingUser.role = 'developer';
+        writeDb(data);
+      }
+      return { success: true, user: existingUser, message: 'Email sudah terdaftar!' };
     }
 
     const newUser: DbUser = {
@@ -203,7 +254,7 @@ export const dbService = {
       name: name.trim(),
       email: normalizedEmail,
       password: password, // For Google accounts this can be empty
-      role: (normalizedEmail === 'andrar1712@gmail.com' || normalizedEmail === 'andrar1713@gmail.com') ? 'developer' : 'user',
+      role: role || (DEVELOPER_EMAILS.includes(normalizedEmail) ? 'developer' : 'user'),
       registeredAt: new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
       isOnline: true,
@@ -339,6 +390,27 @@ export const dbService = {
     writeDb(data);
 
     return { success: true, user, message: `Status akun diubah menjadi ${user.status}` };
+  },
+
+  // Admin: Toggle a user's role (user <-> developer)
+  toggleUserRole(userId: string): { success: boolean; user?: DbUser; message: string } {
+    const data = readDb();
+    const userIdx = data.users.findIndex((u: DbUser) => u.id === userId);
+
+    if (userIdx === -1) {
+      return { success: false, message: 'User tidak ditemukan' };
+    }
+
+    const user = data.users[userIdx];
+    if (DEVELOPER_EMAILS.includes(user.email.toLowerCase().trim())) {
+      return { success: false, message: 'Tidak dapat mengubah peran akun developer utama!' };
+    }
+
+    user.role = user.role === 'developer' ? 'user' : 'developer';
+    data.users[userIdx] = user;
+    writeDb(data);
+
+    return { success: true, user, message: `Peran akun diubah menjadi ${user.role}` };
   },
 
   // Admin: Delete a user

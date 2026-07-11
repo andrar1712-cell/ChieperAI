@@ -222,16 +222,33 @@ router.post('/auth/heartbeat', (req: Request, res: Response) => {
   const { email } = req.body;
   if (email) {
     dbService.updateHeartbeat(email);
-    res.json({ success: true, isOnline: true });
+    const user = dbService.findUserByEmail(email);
+    res.json({ success: true, isOnline: true, user });
   } else {
     res.status(400).json({ success: false, message: 'Email required' });
   }
 });
 
+// Helper to check if email has developer/owner permissions
+const isDeveloper = (email: string | undefined): boolean => {
+  if (!email) return false;
+  const normalized = email.toLowerCase().trim();
+  const DEVELOPER_EMAILS = [
+    'andrar1712@gmail.com',
+    'andrawebdev@gmail.com',
+    'andrar1713@gmail.com'
+  ];
+  if (DEVELOPER_EMAILS.includes(normalized)) {
+    return true;
+  }
+  const user = dbService.findUserByEmail(normalized);
+  return user?.role === 'developer';
+};
+
 // Admin / Developer Endpoints
 router.get('/admin/stats', (req: Request, res: Response) => {
   const requesterEmail = req.headers['x-admin-email'] as string;
-  if (!requesterEmail || requesterEmail !== 'andrar1712@gmail.com') {
+  if (!isDeveloper(requesterEmail)) {
     res.status(403).json({ success: false, message: 'Akses ditolak. Hanya untuk developer!' });
     return;
   }
@@ -241,7 +258,7 @@ router.get('/admin/stats', (req: Request, res: Response) => {
 
 router.get('/admin/users', (req: Request, res: Response) => {
   const requesterEmail = req.headers['x-admin-email'] as string;
-  if (!requesterEmail || requesterEmail !== 'andrar1712@gmail.com') {
+  if (!isDeveloper(requesterEmail)) {
     res.status(403).json({ success: false, message: 'Akses ditolak. Hanya untuk developer!' });
     return;
   }
@@ -251,27 +268,18 @@ router.get('/admin/users', (req: Request, res: Response) => {
 
 router.post('/admin/users/add', (req: Request, res: Response) => {
   const requesterEmail = req.headers['x-admin-email'] as string;
-  if (!requesterEmail || requesterEmail !== 'andrar1712@gmail.com') {
+  if (!isDeveloper(requesterEmail)) {
     res.status(403).json({ success: false, message: 'Akses ditolak!' });
     return;
   }
   const { name, email, password, role } = req.body;
-  const result = dbService.registerUser(name, email, password);
-  if (result.success && result.user && role === 'developer') {
-    // Manually update role if specified as developer
-    const data = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'data', 'db.json'), 'utf-8'));
-    const userIdx = data.users.findIndex((u: any) => u.id === result.user!.id);
-    if (userIdx !== -1) {
-      data.users[userIdx].role = 'developer';
-      fs.writeFileSync(path.join(process.cwd(), 'data', 'db.json'), JSON.stringify(data, null, 2));
-    }
-  }
+  const result = dbService.registerUser(name, email, password, role);
   res.json(result);
 });
 
 router.post('/admin/users/toggle-status', (req: Request, res: Response) => {
   const requesterEmail = req.headers['x-admin-email'] as string;
-  if (!requesterEmail || requesterEmail !== 'andrar1712@gmail.com') {
+  if (!isDeveloper(requesterEmail)) {
     res.status(403).json({ success: false, message: 'Akses ditolak!' });
     return;
   }
@@ -280,9 +288,20 @@ router.post('/admin/users/toggle-status', (req: Request, res: Response) => {
   res.json(result);
 });
 
+router.post('/admin/users/toggle-role', (req: Request, res: Response) => {
+  const requesterEmail = req.headers['x-admin-email'] as string;
+  if (!isDeveloper(requesterEmail)) {
+    res.status(403).json({ success: false, message: 'Akses ditolak!' });
+    return;
+  }
+  const { userId } = req.body;
+  const result = dbService.toggleUserRole(userId);
+  res.json(result);
+});
+
 router.post('/admin/users/delete', (req: Request, res: Response) => {
   const requesterEmail = req.headers['x-admin-email'] as string;
-  if (!requesterEmail || requesterEmail !== 'andrar1712@gmail.com') {
+  if (!isDeveloper(requesterEmail)) {
     res.status(403).json({ success: false, message: 'Akses ditolak!' });
     return;
   }

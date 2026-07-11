@@ -69,11 +69,24 @@ export default function App() {
     
     const sendHeartbeat = async () => {
       try {
-        await fetch('/api/auth/heartbeat', {
+        const res = await fetch('/api/auth/heartbeat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: currentUser.email })
         });
+        const data = await res.json();
+        if (data.success && data.user) {
+          const freshUser = data.user;
+          // Dynamically sync updated properties (like role upgrades) on-the-fly
+          if (
+            freshUser.role !== currentUser.role ||
+            freshUser.name !== currentUser.name ||
+            freshUser.status !== currentUser.status
+          ) {
+            setCurrentUser(freshUser);
+            localStorage.setItem('chieper_user', JSON.stringify(freshUser));
+          }
+        }
       } catch (err) {
         console.warn('Liveness heartbeat error:', err);
       }

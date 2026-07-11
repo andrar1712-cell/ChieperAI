@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, UserCheck, UserX, Activity, ShieldAlert, Cpu, Database, Cpu as Ram, HardDrive,
-  Plus, Search, RefreshCw, Trash2, Ban, ShieldCheck, Mail, Key, UserPlus, X, Zap, Circle
+  Users, UserCheck, UserX, Activity, ShieldAlert, Cpu, Database, HardDrive,
+  Plus, Search, RefreshCw, Trash2, Ban, ShieldCheck, Mail, Key, UserPlus, X, Zap, Circle, Shield
 } from 'lucide-react';
 import { AuthUser } from '../types';
 
@@ -55,8 +55,8 @@ export default function DeveloperConsole({ currentUser }: DeveloperConsoleProps)
   });
 
   // Refresh data from Express server
-  const loadAdminData = async () => {
-    setLoading(true);
+  const loadAdminData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       // Load stats
       const statsRes = await fetch('/api/admin/stats', {
@@ -78,13 +78,20 @@ export default function DeveloperConsole({ currentUser }: DeveloperConsoleProps)
     } catch (error) {
       console.error('Error loading developer console data:', error);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadAdminData();
-  }, [refreshTrigger]);
+    
+    // Background polling every 3 seconds to keep user list fully real-time
+    const interval = setInterval(() => {
+      loadAdminData(true);
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [refreshTrigger, currentUser.email]);
 
   // Update simulated metrics periodically
   useEffect(() => {
@@ -118,6 +125,28 @@ export default function DeveloperConsole({ currentUser }: DeveloperConsoleProps)
       }
     } catch (error) {
       console.error('Error toggling user status:', error);
+    }
+  };
+
+  // Handle Action: Toggle User Role (user <-> developer)
+  const handleToggleRole = async (userId: string) => {
+    try {
+      const res = await fetch('/api/admin/users/toggle-role', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-email': currentUser.email
+        },
+        body: JSON.stringify({ userId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        alert(data.message);
+      }
+    } catch (error) {
+      console.error('Error toggling user role:', error);
     }
   };
 
@@ -543,6 +572,19 @@ export default function DeveloperConsole({ currentUser }: DeveloperConsoleProps)
                               title={isSuspended ? 'Aktifkan Kembali' : 'Tangguhkan Akun'}
                             >
                               <Ban className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Toggle Developer Role Button */}
+                            <button
+                              onClick={() => handleToggleRole(u.id)}
+                              className={`p-1.5 rounded-lg border transition-all ${
+                                u.role === 'developer'
+                                  ? 'bg-yellow-500/15 border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/20'
+                                  : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20'
+                              }`}
+                              title={u.role === 'developer' ? 'Turunkan ke User Standar' : 'Naikkan ke Developer'}
+                            >
+                              <Shield className="w-3.5 h-3.5" />
                             </button>
 
                             {/* Delete User Button */}
